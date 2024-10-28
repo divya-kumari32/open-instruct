@@ -27,9 +27,9 @@ accelerate launch \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
     open_instruct/finetune.py \
-    --model_name_or_path /gpfs/users/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
+    --model_name_or_path /gpfs/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
     --use_flash_attn \
-    --tokenizer_name /gpfs/users/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
+    --tokenizer_name /gpfs/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
     --train_file /gpfs/instruct_data/"${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \

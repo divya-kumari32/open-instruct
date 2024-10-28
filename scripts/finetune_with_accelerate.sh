@@ -30,7 +30,7 @@ accelerate launch \
     --model_name_or_path /gpfs/users/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
     --use_flash_attn \
     --tokenizer_name /gpfs/users/lchu/ckpt/mamba2_9b_dolma_2t/hf/step_1280000_ckp \
-    --train_file data/processed/"${TRAIN_FILE}" \
+    --train_file /gpfs/instruct_data/"${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \
     --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
@@ -40,7 +40,7 @@ accelerate launch \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
     --num_train_epochs 2 \
-    --output_dir output/"${OUTPUT_DIR}" \
+    --output_dir /gpfs/lchu/ckpt/mamba2_9b_dolma_2t/open_instruct/"${OUTPUT_DIR}" \
     --report_to tensorboard \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \

@@ -27,7 +27,7 @@ accelerate launch \
     open_instruct/dpo_tune.py \
     --model_name_or_path "${MODEL_NAME}" \
     --use_flash_attn \
-    --tokenizer_name "${MODEL_NAME}" \
+    --tokenizer_name /gpfs/lchu/ckpt/mamba2_9b_dolma_2t/open_instruct/"${MODEL_NAME}" \
     --use_slow_tokenizer \
     --dataset_name HuggingFaceH4/ultrafeedback_binarized \
     --max_seq_length 2048 \

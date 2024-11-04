@@ -29,9 +29,9 @@ accelerate launch \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
     open_instruct/finetune.py \
-    --model_name_or_path /gpfs/lchu/ckpt/"{CHECKPOINT_PATH}" \
+    --model_name_or_path /gpfs/lchu/ckpt/"${CHECKPOINT_PATH}" \
     --use_flash_attn \
-    --tokenizer_name /gpfs/lchu/ckpt/"{CHECKPOINT_PATH}" \
+    --tokenizer_name /gpfs/lchu/ckpt/"${CHECKPOINT_PATH}" \
     --train_file /gpfs/instruct_data/"${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \

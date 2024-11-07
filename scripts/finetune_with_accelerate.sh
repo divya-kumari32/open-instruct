@@ -14,11 +14,13 @@ GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 CHECKPOINT_PATH=$1
 TRAIN_FILE=$2
 OUTPUT_DIR=$3
+LEARNING_RATE=$4
 
 echo "Training Mamba model using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
 echo "Checkpoint path: ${CHECKPOINT_PATH}"
 echo "Training file: ${TRAIN_FILE}"
 echo "Output directory: ${OUTPUT_DIR}"
+echo "learning rate: ${LEARNING_RATE}"
 
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory,
 # but it will trade off speed.
@@ -37,7 +39,7 @@ accelerate launch \
     --preprocessing_num_workers 128 \
     --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
-    --learning_rate 2e-5 \
+    --learning_rate "${LEARNING_RATE}" \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
     --weight_decay 0. \

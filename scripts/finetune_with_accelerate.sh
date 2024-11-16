@@ -31,10 +31,10 @@ accelerate launch \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
     open_instruct/finetune.py \
-    --model_name_or_path /datasets/lchu/ckpt/"${CHECKPOINT_PATH}" \
+    --model_name_or_path "${CHECKPOINT_PATH}" \
     --use_flash_attn \
-    --tokenizer_name /datasets/lchu/ckpt/"${CHECKPOINT_PATH}" \
-    --train_file /datasets/instruct_data/"${TRAIN_FILE}" \
+    --tokenizer_name "${CHECKPOINT_PATH}" \
+    --train_file "${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \
     --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
@@ -44,7 +44,7 @@ accelerate launch \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
     --num_train_epochs 2 \
-    --output_dir /gpfs/lchu/ckpt/mamba2_9b_dolma_2t/open_instruct/"${OUTPUT_DIR}" \
+    --output_dir "${OUTPUT_DIR}" \
     --report_to tensorboard \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \

@@ -6,27 +6,29 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
-NUM_GPUS=8
-BATCH_SIZE_PER_GPU=1
-TOTAL_BATCH_SIZE=128
-GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
-
 CHECKPOINT_PATH=$1
 TRAIN_FILE=$2
 OUTPUT_DIR=$3
 LEARNING_RATE=$4
+MACHINES=$5
+
+NUM_GPUS=$(($MACHINES * 8))
+BATCH_SIZE_PER_GPU=1
+TOTAL_BATCH_SIZE=128
+GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
 echo "Training Mamba model using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
 echo "Checkpoint path: ${CHECKPOINT_PATH}"
 echo "Training file: ${TRAIN_FILE}"
 echo "Output directory: ${OUTPUT_DIR}"
 echo "learning rate: ${LEARNING_RATE}"
+echo "# Machines: ${MACHINES}"
 
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory,
 # but it will trade off speed.
 accelerate launch \
     --mixed_precision bf16 \
-    --num_machines 1 \
+    --num_machines "${MACHINES}" \
     --num_processes $NUM_GPUS \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \

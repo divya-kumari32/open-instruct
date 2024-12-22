@@ -12,6 +12,7 @@ OUTPUT_DIR=$3
 LEARNING_RATE=$4
 WEIGHT_DECAY=$5
 MACHINES=$6
+EXP_NAME=$7
 
 NUM_GPUS=$(($MACHINES * 8))
 BATCH_SIZE_PER_GPU=1
@@ -25,6 +26,7 @@ echo "Output directory: ${OUTPUT_DIR}"
 echo "learning rate: ${LEARNING_RATE}"
 echo "weight decay: ${WEIGHT_DECAY}"
 echo "# Machines: ${MACHINES}"
+echo "exp name: ${EXP_NAME}"
 
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory,
 # but it will trade off speed.
@@ -52,10 +54,10 @@ accelerate launch \
     --weight_decay "${WEIGHT_DECAY}" \
     --num_train_epochs 2 \
     --output_dir "${OUTPUT_DIR}" \
-    # --with_tracking 
-    # --wandb_entity project-avengers/sft-weight-ablations 
-    # --exp_name tuluv3_weight_decay_0.1
-    --report_to tensorboard \
+    --with_tracking 
+    --wandb_entity project-avengers/sft-weight-ablations 
+    --exp_name "${EXP_NAME}"
+    --report_to wandb \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \
     --push_to_hub False \

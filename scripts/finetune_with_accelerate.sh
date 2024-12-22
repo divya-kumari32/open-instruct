@@ -52,10 +52,10 @@ accelerate launch \
     --weight_decay "${WEIGHT_DECAY}" \
     --num_train_epochs 2 \
     --output_dir "${OUTPUT_DIR}" \
-    --with_tracking 
-    --wandb_entity project-avengers/sft-weight-ablations 
-    --exp_name tuluv3_weight_decay_0.1
-    --report_to wandb \
+    # --with_tracking 
+    # --wandb_entity project-avengers/sft-weight-ablations 
+    # --exp_name tuluv3_weight_decay_0.1
+    --report_to tensorboard \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \
     --push_to_hub False \

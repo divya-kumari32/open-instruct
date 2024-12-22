@@ -10,7 +10,8 @@ CHECKPOINT_PATH=$1
 TRAIN_FILE=$2
 OUTPUT_DIR=$3
 LEARNING_RATE=$4
-MACHINES=$5
+WEIGHT_DECAY=$5
+MACHINES=$6
 
 NUM_GPUS=$(($MACHINES * 8))
 BATCH_SIZE_PER_GPU=1
@@ -22,6 +23,7 @@ echo "Checkpoint path: ${CHECKPOINT_PATH}"
 echo "Training file: ${TRAIN_FILE}"
 echo "Output directory: ${OUTPUT_DIR}"
 echo "learning rate: ${LEARNING_RATE}"
+echo "weight decay: ${WEIGHT_DECAY}"
 echo "# Machines: ${MACHINES}"
 
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory,
@@ -47,7 +49,7 @@ accelerate launch \
     --learning_rate "${LEARNING_RATE}" \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
-    --weight_decay 0. \
+    --weight_decay "${WEIGHT_DECAY}" \
     --num_train_epochs 2 \
     --output_dir "${OUTPUT_DIR}" \
     --report_to tensorboard \

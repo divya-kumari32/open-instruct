@@ -36,9 +36,9 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
-    --machine_rank="${RANK}" \
-    --main_process_ip="${MASTER_ADDR}" \
-    --main_process_port="${MASTER_PORT}" \
+    # --machine_rank="${RANK}" \
+    # --main_process_ip="${MASTER_ADDR}" \
+    # --main_process_port="${MASTER_PORT}" \
     open_instruct/finetune.py \
     --model_name_or_path "${CHECKPOINT_PATH}" \
     --use_flash_attn \
@@ -54,8 +54,8 @@ accelerate launch \
     --weight_decay "${WEIGHT_DECAY}" \
     --num_train_epochs 2 \
     --output_dir "${OUTPUT_DIR}" \
-    --with_tracking 
-    --wandb_entity project-avengers/sft-weight-ablations 
+    --with_tracking
+    --wandb_entity project-avengers
     --exp_name "${EXP_NAME}"
     --report_to wandb \
     --logging_steps 1 \

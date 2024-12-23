@@ -36,9 +36,6 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
-    # --machine_rank="${RANK}" \
-    # --main_process_ip="${MASTER_ADDR}" \
-    # --main_process_port="${MASTER_PORT}" \
     open_instruct/finetune.py \
     --model_name_or_path "${CHECKPOINT_PATH}" \
     --use_flash_attn \

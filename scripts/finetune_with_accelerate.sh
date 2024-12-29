@@ -10,14 +10,15 @@ CHECKPOINT_PATH=$1
 TRAIN_FILE=$2
 OUTPUT_DIR=$3
 LEARNING_RATE=$4
-GLOBAL_BATCH_SIZE=$5
-WEIGHT_DECAY=$6
-MACHINES=$7
-EXP_NAME=$8
+# GLOBAL_BATCH_SIZE=$5
+# WEIGHT_DECAY=$6
+MACHINES=$6
+# EXP_NAME=$7
 
 NUM_GPUS=$(($MACHINES * 8))
+# WEIGHT_DECAY=$(($WEIGHT_DECAY))
 BATCH_SIZE_PER_GPU=1
-TOTAL_BATCH_SIZE=$(($GLOBAL_BATCH_SIZE))
+TOTAL_BATCH_SIZE=128
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
 echo "Training Mamba model using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
@@ -25,9 +26,9 @@ echo "Checkpoint path: ${CHECKPOINT_PATH}"
 echo "Training file: ${TRAIN_FILE}"
 echo "Output directory: ${OUTPUT_DIR}"
 echo "learning rate: ${LEARNING_RATE}"
-echo "weight decay: ${WEIGHT_DECAY}"
+# echo "weight decay: ${WEIGHT_DECAY}"
 echo "# Machines: ${MACHINES}"
-echo "exp name: ${EXP_NAME}"
+# echo "exp name: ${EXP_NAME}"
 
 # You can also set --gradient_checkpointing or use `stage3_offloading_accelerate.conf` to save memory,
 # but it will trade off speed.
@@ -49,14 +50,14 @@ accelerate launch \
     --learning_rate "${LEARNING_RATE}" \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
-    --weight_decay "${WEIGHT_DECAY}" \
+    --weight_decay 0. \
     --num_train_epochs 2 \
     --output_dir "${OUTPUT_DIR}" \
     --with_tracking \
-    --wandb_entity project-avengers \
-    --exp_name "${EXP_NAME}" \
-    --report_to wandb \
+    --report_to tensorboard \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \
     --push_to_hub False \
     # --max_train_samples 1000000 \
+    # --wandb_entity project-avengers \
+    # --exp_name "${EXP_NAME}" \

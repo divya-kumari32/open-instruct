@@ -40,7 +40,7 @@ accelerate launch \
     open_instruct/finetune.py \
     --model_name_or_path "${CHECKPOINT_PATH}" \
     --use_flash_attn \
-    --tokenizer_name "${CHECKPOINT_PATH}" \
+    --tokenizer_name /datasets/instruct_models/tuluv3/lr1e_6 \
     --train_file "${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \

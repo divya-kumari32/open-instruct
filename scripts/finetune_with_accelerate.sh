@@ -40,7 +40,7 @@ accelerate launch \
     open_instruct/finetune.py \
     --model_name_or_path "${CHECKPOINT_PATH}" \
     --use_flash_attn \
-    --tokenizer_name /datasets/instruct_models/tuluv3/lr1e_6 \
+    --tokenizer_name "${CHECKPOINT_PATH}" \
     --train_file "${TRAIN_FILE}" \
     --max_seq_length 4096 \
     --preprocessing_num_workers 128 \
@@ -55,7 +55,7 @@ accelerate launch \
     --with_tracking \
     --wandb_entity project-avengers \
     --exp_name "${EXP_NAME}" \
-    --report_to tensorboard \
+    --report_to wandb \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \
     --push_to_hub False \

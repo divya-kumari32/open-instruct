@@ -55,7 +55,6 @@ accelerate launch \
     --with_tracking \
     --wandb_entity project-avengers \
     --exp_name "${EXP_NAME}" \
-    --project_name "Bamba_SFT" \
     --report_to wandb \
     --logging_steps 1 \
     --try_launch_beaker_eval_jobs False \

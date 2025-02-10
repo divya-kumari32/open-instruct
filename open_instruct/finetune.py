@@ -782,6 +782,7 @@ def main(args: FlatArguments):
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
+    print(f"Length of train dataloader is: {len(train_dataloader)}")
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch

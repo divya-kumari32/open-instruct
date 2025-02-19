@@ -22,10 +22,12 @@ import random
 import shutil
 import subprocess
 import time
+import warnings
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import partial
 from typing import List, Optional, Union
+
 
 import datasets
 import deepspeed
@@ -67,6 +69,7 @@ from open_instruct.utils import (
     maybe_use_ai2_wandb_entity,
     upload_metadata_to_hf,
 )
+from padding_free_collator import TensorDataCollatorWithFlattening
 
 logger = get_logger(__name__)
 
@@ -338,7 +341,7 @@ class FlatArguments:
         default=0.5,
         metadata={"help": "Weight for load balancing loss if applicable."},
     )
-    try_auto_save_to_beaker: bool = True
+    try_auto_save_to_beaker: bool = False
     """Whether to try to save the model to Beaker dataset `/output` after training"""
     push_to_hub: bool = True
     """Whether to upload the saved model to huggingface"""
@@ -350,10 +353,18 @@ class FlatArguments:
     """The revision of the saved model in the Hugging Face Hub (can be autoset if not given)"""
     hf_repo_url: Optional[str] = None
     """The url of the saved model in the Hugging Face Hub (will be autoset)"""
-    try_launch_beaker_eval_jobs: bool = True
+    try_launch_beaker_eval_jobs: bool = False
     """Whether to launch beaker evaluation jobs after training"""
     hf_metadata_dataset: Optional[str] = "allenai/tulu-3-evals"
     """What dataset to upload the metadata to. If unset, don't upload metadata"""
+    padding_free: bool = field(
+        default=False,
+        metadata={"help": "Whether to use padding-free collation via DataCollatorWithFlattening"},
+    )
+    project_name: str = field(
+        default="open_instruct_internal",
+        metadata={"help": "Project name, e.g for wandb tracking. "},
+    )
 
     def __post_init__(self):
         if self.reduce_loss not in ["mean", "sum"]:
@@ -453,7 +464,6 @@ def encode_sft_example(example, tokenizer, max_seq_length):
         "labels": labels.flatten(),
         "attention_mask": attention_mask.flatten(),
     }
-
 
 def main(args: FlatArguments):
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
@@ -748,10 +758,17 @@ def main(args: FlatArguments):
         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # DataLoaders creation:
+    if args.padding_free:
+        accelerator.print("Using padding-free collation")
+        collate_fn=TensorDataCollatorWithFlattening()
+    else:
+        collate_fn=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest")
+
+
     train_dataloader = DataLoader(
         train_dataset,
         shuffle=True,
-        collate_fn=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest"),
+        collate_fn=collate_fn,
         batch_size=args.per_device_train_batch_size,
     )
 
@@ -782,7 +799,6 @@ def main(args: FlatArguments):
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    print(f"Length of train dataloader is: {len(train_dataloader)}")
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -813,6 +829,10 @@ def main(args: FlatArguments):
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler
     )
+    if accelerator.process_index == 0:
+        print(f"{model=}")
+        print(f"{accelerator.state.fsdp_plugin=}")
+        print(f"{args=}")
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
@@ -839,7 +859,7 @@ def main(args: FlatArguments):
         if is_beaker_job():
             experiment_config.update(vars(beaker_config))
         accelerator.init_trackers(
-            "open_instruct_internal",
+            args.project_name,
             experiment_config,
             init_kwargs={
                 "wandb": {
@@ -904,8 +924,17 @@ def main(args: FlatArguments):
         else:
             active_dataloader = train_dataloader
         for step, batch in enumerate(active_dataloader):
-            local_total_tokens += batch["attention_mask"].sum()
-            total_token_including_padding += batch["attention_mask"].numel()
+            if "attention_mask" in batch:
+                local_total_tokens += batch["attention_mask"].sum()
+                total_token_including_padding += batch["attention_mask"].numel()
+            elif "position_ids" in batch:
+                tokens_in_batch = batch["position_ids"].numel()
+                local_total_tokens += tokens_in_batch
+                total_token_including_padding += tokens_in_batch
+            else:
+                raise ValueError(
+                    f"Expected attention_mask or position_ids in batch, found {batch=}"
+                )
             with accelerator.accumulate(model):
                 if args.load_balancing_loss:
                     outputs = model(**batch, use_cache=False, output_router_logits=True)
@@ -960,10 +989,26 @@ def main(args: FlatArguments):
                     )
                     total_tokens = accelerator.gather(local_total_tokens).sum().item()
                     total_tokens_including_padding = accelerator.gather(total_token_including_padding).sum().item()
+                    avg_tokens_per_batch = (
+                        total_tokens
+                        / accelerator.num_processes
+                        / args.per_device_train_batch_size
+                        / args.gradient_accumulation_steps
+                        / completed_steps
+                    )
+                    avg_tokens_per_batch_including_padding = (
+                        total_tokens_including_padding
+                        / accelerator.num_processes
+                        / args.per_device_train_batch_size
+                        / args.gradient_accumulation_steps
+                        / completed_steps
+                    )
                     metrics_to_log = {
                         "learning_rate": lr_scheduler.get_last_lr()[0],
                         "train_loss": avg_loss,
                         "total_tokens": total_tokens,
+                        "avg_tokens_per_batch": avg_tokens_per_batch,
+                        "avg_tokens_per_batch_including_padding": avg_tokens_per_batch_including_padding,
                         "per_device_tps": total_tokens / accelerator.num_processes / (time.time() - start_time),
                         "total_tokens_including_padding": total_tokens_including_padding,
                         "per_device_tps_including_padding": total_tokens_including_padding
@@ -984,6 +1029,7 @@ def main(args: FlatArguments):
                         logger.info(
                             f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, TPS: {total_tokens / (time.time() - start_time)}"
                         )
+                    logger.info(f"{metrics_to_log=}")
                     if args.with_tracking:
                         accelerator.log(
                             metrics_to_log,

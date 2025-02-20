@@ -402,7 +402,6 @@ def encode_sft_example(example, tokenizer, max_seq_length):
     """
     
     for key, value in example.items():
-        print(f"Example: {example}")
         if isinstance(value, np.ndarray) and value.dtype in [np.float64, np.float32]:
             example[key] = value.astype('float32')
             

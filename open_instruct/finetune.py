@@ -400,6 +400,12 @@ def encode_sft_example(example, tokenizer, max_seq_length):
     Here, we assume each example has a 'messages' field. Each message in it is a dict with 'role' and 'content' fields.
     We use the `apply_chat_template` function from the tokenizer to tokenize the messages and prepare the input and label tensors.
     """
+    
+    for key, value in example.items():
+        print(f"Example: {example}")
+        if isinstance(value, np.ndarray) and value.dtype in [np.float64, np.float32]:
+            example[key] = value.astype('float32')
+            
     messages = example["messages"]
     if len(messages) == 0:
         raise ValueError("messages field is empty.")
@@ -413,6 +419,7 @@ def encode_sft_example(example, tokenizer, max_seq_length):
         add_generation_prompt=False,
     )
     labels = input_ids.clone()
+            
     # mask the non-assistant part for avoiding loss
     for message_idx, message in enumerate(messages):
         if message["role"] != "assistant":
@@ -460,6 +467,8 @@ def encode_sft_example(example, tokenizer, max_seq_length):
             if max_seq_length and message_end_idx >= max_seq_length:
                 break
     attention_mask = torch.ones_like(input_ids)
+    
+    
     return {
         "input_ids": input_ids.flatten(),
         "labels": labels.flatten(),
@@ -741,10 +750,6 @@ def main(args: FlatArguments):
         train_dataset = train_dataset.select(range(max_train_samples))
 
     logger.info(f"Printing dataset features: {train_dataset.features}")
-    
-    # for column in train_dataset.column_names:
-    #     if train_dataset[column].dtype in [np.float32, np.float64]:
-    #         train_dataset = train_dataset.map(lambda x: {column: np.array(x[column], dtype=np.float32)})
     
     with accelerator.main_process_first():
         train_dataset = train_dataset.map(

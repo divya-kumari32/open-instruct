@@ -30,6 +30,7 @@ from typing import List, Optional, Union
 
 
 import datasets
+import numpy as np
 import deepspeed
 import torch
 import transformers
@@ -739,6 +740,12 @@ def main(args: FlatArguments):
         logger.info(f"Limiting training samples to {max_train_samples} from {len(train_dataset)}.")
         train_dataset = train_dataset.select(range(max_train_samples))
 
+    logger.info(f"Printing dataset features: {train_dataset.features}")
+    
+    # for column in train_dataset.column_names:
+    #     if train_dataset[column].dtype in [np.float32, np.float64]:
+    #         train_dataset = train_dataset.map(lambda x: {column: np.array(x[column], dtype=np.float32)})
+    
     with accelerator.main_process_first():
         train_dataset = train_dataset.map(
             partial(encode_sft_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length),

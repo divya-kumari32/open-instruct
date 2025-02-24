@@ -383,6 +383,11 @@ class FlatArguments:
     hf_metadata_dataset: Optional[str] = "allenai/tulu-3-evals"
     """What dataset to upload the metadata to. If unset, don't upload metadata"""
 
+    project_name: str = field(
+        default="open_instruct_internal",
+        metadata={"help": "Project name, e.g for wandb tracking. "},
+    )
+
     def __post_init__(self):
         if self.reduce_loss not in ["mean", "sum"]:
             raise ValueError("reduce_loss must be either 'mean' or 'sum'")
@@ -892,7 +897,7 @@ def main(args: FlatArguments):
         if is_beaker_job():
             experiment_config.update(vars(beaker_config))
         accelerator.init_trackers(
-            "open_instruct_internal",
+            args.project_name,
             experiment_config,
             init_kwargs={
                 "wandb": {

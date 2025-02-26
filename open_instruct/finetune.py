@@ -30,7 +30,6 @@ from typing import List, Optional, Union
 
 
 import datasets
-import numpy as np
 import deepspeed
 import torch
 import transformers
@@ -342,7 +341,7 @@ class FlatArguments:
         default=0.5,
         metadata={"help": "Weight for load balancing loss if applicable."},
     )
-    try_auto_save_to_beaker: bool = False
+    try_auto_save_to_beaker: bool = True
     """Whether to try to save the model to Beaker dataset `/output` after training"""
     push_to_hub: bool = True
     """Whether to upload the saved model to huggingface"""
@@ -354,7 +353,7 @@ class FlatArguments:
     """The revision of the saved model in the Hugging Face Hub (can be autoset if not given)"""
     hf_repo_url: Optional[str] = None
     """The url of the saved model in the Hugging Face Hub (will be autoset)"""
-    try_launch_beaker_eval_jobs: bool = False
+    try_launch_beaker_eval_jobs: bool = True
     """Whether to launch beaker evaluation jobs after training"""
     hf_metadata_dataset: Optional[str] = "allenai/tulu-3-evals"
     """What dataset to upload the metadata to. If unset, don't upload metadata"""
@@ -400,11 +399,6 @@ def encode_sft_example(example, tokenizer, max_seq_length):
     Here, we assume each example has a 'messages' field. Each message in it is a dict with 'role' and 'content' fields.
     We use the `apply_chat_template` function from the tokenizer to tokenize the messages and prepare the input and label tensors.
     """
-    
-    for key, value in example.items():
-        if isinstance(value, np.ndarray) and value.dtype in [np.float64, np.float32]:
-            example[key] = value.astype('float32')
-            
     messages = example["messages"]
     if len(messages) == 0:
         raise ValueError("messages field is empty.")
@@ -418,7 +412,6 @@ def encode_sft_example(example, tokenizer, max_seq_length):
         add_generation_prompt=False,
     )
     labels = input_ids.clone()
-            
     # mask the non-assistant part for avoiding loss
     for message_idx, message in enumerate(messages):
         if message["role"] != "assistant":
@@ -466,8 +459,6 @@ def encode_sft_example(example, tokenizer, max_seq_length):
             if max_seq_length and message_end_idx >= max_seq_length:
                 break
     attention_mask = torch.ones_like(input_ids)
-    
-    
     return {
         "input_ids": input_ids.flatten(),
         "labels": labels.flatten(),
@@ -748,8 +739,6 @@ def main(args: FlatArguments):
         logger.info(f"Limiting training samples to {max_train_samples} from {len(train_dataset)}.")
         train_dataset = train_dataset.select(range(max_train_samples))
 
-    logger.info(f"Printing dataset features: {train_dataset.features}")
-    
     with accelerator.main_process_first():
         train_dataset = train_dataset.map(
             partial(encode_sft_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length),

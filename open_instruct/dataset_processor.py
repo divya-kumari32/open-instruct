@@ -148,6 +148,22 @@ CHAT_TEMPLATES = {
         "{% endif %}"
         "{% endfor %}"
     ),
+    "granite": (
+        "{% for message in messages %}"
+        "{% if message['role'] == 'assistant' %}"
+            "{% if not loop.last %}"
+            "{{ '<|assistant|>\n' + message['content'] + eos_token + '\n' }}"
+            "{% else %}"
+            "{{ '<|assistant|>\n' + message['content'] + eos_token }}"
+            "{% endif %}"
+        "{% else %}"
+        "{{ '<|' + message['role'] + '|>\n' + message['content'] + '\n' }}"
+        "{% endif %}"
+        "{% if loop.last and add_generation_prompt %}"
+        "{{ '<|assistant|>\n' }}"
+        "{% endif %}"
+        "{% endfor %}"
+    ),
 }
 # flake8: noqa
 

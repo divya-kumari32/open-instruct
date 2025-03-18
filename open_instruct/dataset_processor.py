@@ -165,23 +165,23 @@ CHAT_TEMPLATES = {
         "{% endfor %}"
     ),
     "granite2": (
-        "{%- for message in messages%}"  
-        "{%- if message['role'] == "system" %}"  
-            "{{ '<|start_of_role|>system<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- elif message['role'] == 'user' %}"    
-            "{{ '<|start_of_role|>user<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- elif message['role'] == 'assistant' %}"    
-            "{{ '<|start_of_role|>assistant<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- elif message['role'] == 'tools' %}"    
-            "{{ '<|start_of_role|>tools<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- elif message['role'] == 'tool' %}"    
-            "{{ '<|start_of_role|>tool<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- elif message['role'] == 'documents' %}"    
-            "{{ '<|start_of_role|>documents<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- else %}"  
-            "{{ '<|start_of_role|>unknown<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}"  
-        "{%- endif %}"  
-      "{%- endfor %}"
+        """{%- for message in messages %}
+        {%- if message['role'] == "system" %}
+        {{ '<|start_of_role|>system<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- elif message['role'] == 'user' %}
+        {{ '<|start_of_role|>user<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- elif message['role'] == 'assistant' %}
+        {{ '<|start_of_role|>assistant<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- elif message['role'] == 'tools' %}
+        {{ '<|start_of_role|>tools<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- elif message['role'] == 'tool' %}
+        {{ '<|start_of_role|>tool<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- elif message['role'] == 'documents' %}
+        {{ '<|start_of_role|>documents<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- else %}
+        {{ '<|start_of_role|>unknown<|end_of_role|>' + message['content'] + '<|end_of_text|>\n' }}
+        {%- endif %}
+        {%- endfor %}"""
     ),
 }
 # flake8: noqa

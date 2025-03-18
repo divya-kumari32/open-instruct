@@ -774,15 +774,23 @@ def main(args: FlatArguments):
     )
 
     print("Before accelerator.prepare:")
-    for batch in train_dataloader:
-        input_ids = batch['input_ids'][0].tolist()
-        labels = batch['labels'][0].tolist()
+    for i, sample in enumerate(train_dataset):
+        print(f"\n{'='*20} Sample {i+1} {'='*20}\n")
+        
+        input_ids = sample['input_ids']
+        labels = sample['labels']
+        
+        input_text = tokenizer.decode(input_ids, skip_special_tokens=False)
+        labels_text = tokenizer.decode([id for id in labels if id != -100], skip_special_tokens=False)
     
-        input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-        labels_text = tokenizer.decode([label for label in labels if label != -100], skip_special_tokens=True)
+        print(f"Input IDs:\n{input_ids}\n")
+        print(f"Input Text:\n{input_text}\n")
     
-        print("\nInput text:\n", input_text)
-        print("\nLabels text:\n", labels_text)
+        print(f"Labels IDs:\n{labels}\n")
+        print(f"Labels Text:\n{labels_text}\n")
+
+    # Reset printing options
+    torch.set_printoptions(profile="default")
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.

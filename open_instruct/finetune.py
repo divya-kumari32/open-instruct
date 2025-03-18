@@ -764,7 +764,8 @@ def main(args: FlatArguments):
     else:
         collate_fn=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest")
 
-
+    torch.set_printoptions(profile="full")
+    
     train_dataloader = DataLoader(
         train_dataset,
         shuffle=True,

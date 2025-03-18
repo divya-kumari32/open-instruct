@@ -775,9 +775,14 @@ def main(args: FlatArguments):
 
     print("Before accelerator.prepare:")
     for batch in train_dataloader:
-        print(batch.keys())
-        print(batch)
-        break
+        input_ids = batch['input_ids'][0].tolist()
+        labels = batch['labels'][0].tolist()
+    
+        input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
+        labels_text = tokenizer.decode([label for label in labels if label != -100], skip_special_tokens=True)
+    
+        print("\nInput text:\n", input_text)
+        print("\nLabels text:\n", labels_text)
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
@@ -839,9 +844,14 @@ def main(args: FlatArguments):
 
     print("\nAfter accelerator.prepare:")
     for batch in train_dataloader:
-        print(batch.keys())  
-        print(batch)
-        break
+        input_ids = batch['input_ids'][0].tolist()
+        labels = batch['labels'][0].tolist()
+    
+        input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
+        labels_text = tokenizer.decode([label for label in labels if label != -100], skip_special_tokens=True)
+    
+        print("\nInput text:\n", input_text)
+        print("\nLabels text:\n", labels_text)
     
     if accelerator.process_index == 0:
         print(f"{model=}")

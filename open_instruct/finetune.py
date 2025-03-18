@@ -772,6 +772,12 @@ def main(args: FlatArguments):
         batch_size=args.per_device_train_batch_size,
     )
 
+    print("Before accelerator.prepare:")
+    for batch in train_dataloader:
+        print(batch.keys())
+        print(batch)
+        break
+
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "layer_norm.weight"]
@@ -829,6 +835,13 @@ def main(args: FlatArguments):
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler
     )
+
+    print("\nAfter accelerator.prepare:")
+    for batch in train_dataloader:
+        print(batch.keys())  
+        print(batch)
+        break
+    
     if accelerator.process_index == 0:
         print(f"{model=}")
         print(f"{accelerator.state.fsdp_plugin=}")

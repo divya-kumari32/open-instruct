@@ -771,6 +771,20 @@ def main(args: FlatArguments):
         batch_size=args.per_device_train_batch_size,
     )
 
+    torch.set_printoptions(profile="full")
+
+    for i, sample in enumerate(train_dataset):
+        print(f"\n{'='*20} Sample {i+1} {'='*20}\n")
+        
+        input_ids = sample['input_ids']
+        labels = sample['labels']
+        attention_mask = sample['attention_mask']
+        
+        print(f"Attention Mask:\n{attention_mask}\n")
+    
+    # Reset printing options
+    torch.set_printoptions(profile="default")
+
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "layer_norm.weight"]

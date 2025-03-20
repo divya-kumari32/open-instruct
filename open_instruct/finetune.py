@@ -775,9 +775,6 @@ def main(args: FlatArguments):
         print(batch.keys())
         break
 
-# Reset printing options
-torch.set_printoptions(profile="default")
-
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "layer_norm.weight"]

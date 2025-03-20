@@ -771,18 +771,23 @@ def main(args: FlatArguments):
         batch_size=args.per_device_train_batch_size,
     )
 
-    torch.set_printoptions(profile="full")
-
-    for i, sample in enumerate(train_dataset):
-        print(f"\n{'='*20} Sample {i+1} {'='*20}\n")
-        
-        input_ids = sample['input_ids']
-        labels = sample['labels']
-        attention_mask = sample['attention_mask']
-        
-        print(f"Attention Mask:\n{attention_mask}\n")
+    # Explicitly remove tensor print limits
+    torch.set_printoptions(threshold=10_000, linewidth=200)
     
-    # Reset printing options
+    # Loop over all batches in your dataloader
+    for batch_idx, batch in enumerate(train_dataloader):
+        print(f"\n{'='*20} Batch {batch_idx+1} {'='*20}\n")
+    
+        attention_masks = batch['attention_mask']
+        input_ids = batch['input_ids']
+        labels = batch['labels']
+    
+        # Iterate over each sample in batch
+        for sample_idx in range(attention_masks.size(0)):
+            print(f"Sample {sample_idx + 1} in Batch {batch_idx + 1}:\n")
+            print(f"Attention Mask:\n{attention_masks[sample_idx]}\n")
+    
+    # Reset print options
     torch.set_printoptions(profile="default")
 
     # Optimizer

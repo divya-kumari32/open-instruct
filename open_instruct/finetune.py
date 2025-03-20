@@ -771,9 +771,12 @@ def main(args: FlatArguments):
         batch_size=args.per_device_train_batch_size,
     )
 
-    for batch in train_dataloader:
-        print("Attention masks clearly after fix:", batch["attention_mask"])
+    for batch_idx, batch in enumerate(train_dataloader):
+        print(batch.keys())
         break
+
+# Reset printing options
+torch.set_printoptions(profile="default")
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.

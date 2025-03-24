@@ -751,19 +751,6 @@ def main(args: FlatArguments):
             desc="Tokenizing and reformatting instruction data",
         )
         train_dataset.set_format(type="pt")
-
-        torch.set_printoptions(threshold=10_000, linewidth=200)
-
-        for i, sample in enumerate(train_dataset):
-            print(f"\n{'='*20} Sample {i+1} {'='*20}\n")
-            
-            attention_mask = sample['attention_mask']
-        
-            print(f"Attention Mask:\n{attention_mask}\n")
-        
-        # Reset to default afterward
-        torch.set_printoptions(profile="default")
-    
         train_dataset = train_dataset.filter(lambda example: (example["labels"] != -100).any())
 
     # Log a few random samples from the training set:

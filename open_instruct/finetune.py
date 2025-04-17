@@ -482,12 +482,6 @@ def main(args: FlatArguments):
             args.hf_repo_revision = args.run_name
         args.hf_repo_url = f"https://huggingface.co/{args.hf_repo_id}/tree/{args.hf_repo_revision}"
 
-    # Exit immediately if training already completed
-    final_completion_marker = os.path.join(args.output_dir, "TRAINING_COMPLETED")
-    if os.path.exists(final_completion_marker):
-        print(f"Training already completed, found completion marker at {final_completion_marker}. Exiting.")
-        exit(0)
-    
     if is_beaker_job():
         beaker_config = maybe_get_beaker_config()
 
@@ -769,7 +763,8 @@ def main(args: FlatArguments):
         collate_fn=TensorDataCollatorWithFlattening()
     else:
         collate_fn=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest")
-    
+
+
     train_dataloader = DataLoader(
         train_dataset,
         shuffle=True,
@@ -834,7 +829,6 @@ def main(args: FlatArguments):
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler
     )
-    
     if accelerator.process_index == 0:
         print(f"{model=}")
         print(f"{accelerator.state.fsdp_plugin=}")
@@ -1161,13 +1155,6 @@ def main(args: FlatArguments):
     accelerator.wait_for_everyone()
     if args.with_tracking:
         accelerator.end_training()
-
-    # Write a final completion marker indicating training fully completed
-    if accelerator.is_local_main_process:
-        final_completion_marker = os.path.join(args.output_dir, "TRAINING_COMPLETED")
-        with open(final_completion_marker, "w") as f:
-            f.write("Final training completion marker.\n")
-
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ docker build --build-arg CUDA=12.1.0 --build-arg TARGET=cudnn8-devel --build-arg
 * **Docker with uv**: You can also use the Dockerfile to build a Docker image with uv. You can build the image with the following command:
 
 ```bash
-docker build -f Dockerfile.uv -t open_instruct_dev_uv .
+docker build -f Dockerfile.uv --build-arg UV_CACHE_DIR=$UV_CACHE_DIR -t open_instruct_dev_uv .
 # if you are interally at AI2, you can create an image like this:
 beaker_user=$(beaker account whoami --format json | jq -r '.[0].name')
 beaker image delete $beaker_user/open_instruct_dev_uv 
@@ -105,9 +105,9 @@ You can run the following commands for getting started:
 
 ```bash
 # quick debugging run using 1 GPU
-sh scripts/finetune_with_accelerate_config.sh 1 configs/train_configs/sft/mini.yaml
+bash scripts/train/finetune/mini.sh
 # train an 8B tulu3 model using 8 GPU
-sh scripts/finetune_with_accelerate_config.sh 8 configs/train_configs/tulu3/tulu3_sft.yaml
+bash scripts/train/finetune/tulu_finetune_mix.sh
 ```
 
 
@@ -115,91 +115,23 @@ sh scripts/finetune_with_accelerate_config.sh 8 configs/train_configs/tulu3/tulu
 
 ```bash
 # quick debugging run using 1 GPU
-sh scripts/dpo_train_with_accelerate_config.sh 1 configs/train_configs/dpo/mini.yaml
+bash scripts/train/dpo/mini.sh
 # train an 8B tulu3 model using 8 GPU
-sh scripts/dpo_train_with_accelerate_config.sh 8 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
+bash scripts/train/dpo/tulu_preference_mix.sh
 ```
 
 
 ### Reinforcement Learning with Verifiable Rewards (RLVR)
 
 ```bash
-# quick debugging run using 2 GPU (1 for inference, 1 for training)
-# here we are using `HuggingFaceTB/SmolLM2-360M-Instruct`; it's prob not
-# gonna work, but it's easy to test run and print stuff.
-python open_instruct/ppo_vllm_thread_ray_gtrl.py \
-    --dataset_mixer '{"ai2-adapt-dev/gsm8k_math_ifeval_ground_truth_mixed": 1.0}' \
-    --dataset_train_splits train \
-    --dataset_eval_mixer '{"ai2-adapt-dev/gsm8k_math_ground_truth": 1.0}' \
-    --dataset_eval_splits test \
-    --max_token_length 2048 \
-    --max_prompt_token_length 2048 \
-    --response_length 2048 \
-    --model_name_or_path HuggingFaceTB/SmolLM2-360M-Instruct \
-    --reward_model_path HuggingFaceTB/SmolLM2-360M-Instruct \
-    --non_stop_penalty \
-    --stop_token eos \
-    --temperature 1.0 \
-    --ground_truths_key ground_truth \
-    --chat_template tulu \
-    --sft_messages_key messages \
-    --learning_rate 3e-7 \
-    --total_episodes 10000 \
-    --penalty_reward_value -10.0 \
-    --deepspeed_stage 3 \
-    --per_device_train_batch_size 2 \
-    --local_rollout_forward_batch_size 2 \
-    --local_mini_batch_size 32 \
-    --local_rollout_batch_size 32 \
-    --num_epochs 1 \
-    --actor_num_gpus_per_node 1 \
-    --vllm_tensor_parallel_size 1 \
-    --beta 0.05 \
-    --apply_verifiable_reward true \
-    --output_dir output/rlvr_1b \
-    --seed 3 \
-    --num_evals 3 \
-    --save_freq 100 \
-    --reward_model_multiplier 0.0 \
-    --gradient_checkpointing \
-    --with_tracking
+# quick debugging run using 1 GPU (0.5 for inference, 0.5 for training)
+# here we are using a small model, so it's prob not gonna train good models, but it's easy to test run and print stuff.
+bash scripts/train/rlvr/ppo_mini.sh
+bash scripts/train/rlvr/ppo2_mini.sh # experimental support (ppo2 adds kl to loss directly instead of using KL penalty in rewards)
+bash scripts/train/rlvr/grpo_mini.sh
 
 # train an 8B tulu3 model using 8 GPU (1 for inference, 7 for training)
-python open_instruct/ppo_vllm_thread_ray_gtrl.py \
-    --dataset_mixer '{"ai2-adapt-dev/gsm8k_math_ifeval_ground_truth_mixed": 1.0}' \
-    --dataset_train_splits train \
-    --dataset_eval_mixer '{"ai2-adapt-dev/gsm8k_math_ground_truth": 1.0}' \
-    --dataset_eval_splits test \
-    --max_token_length 2048 \
-    --max_prompt_token_length 2048 \
-    --response_length 2048 \
-    --model_name_or_path allenai/Llama-3.1-Tulu-3-8B-DPO \
-    --reward_model_path allenai/Llama-3.1-Tulu-3-8B-RM \
-    --non_stop_penalty \
-    --stop_token eos \
-    --temperature 1.0 \
-    --ground_truths_key ground_truth \
-    --chat_template tulu \
-    --sft_messages_key messages \
-    --learning_rate 3e-7 \
-    --total_episodes 10000000 \
-    --penalty_reward_value -10.0 \
-    --deepspeed_stage 3 \
-    --per_device_train_batch_size 2 \
-    --local_rollout_forward_batch_size 2 \
-    --local_mini_batch_size 32 \
-    --local_rollout_batch_size 32 \
-    --actor_num_gpus_per_node 7 \
-    --vllm_tensor_parallel_size 1 \
-    --beta 0.05 \
-    --apply_verifiable_reward true \
-    --output_dir output/rlvr_8b \
-    --seed 3 \
-    --num_evals 3 \
-    --save_freq 100 \
-    --reward_model_multiplier 0.0 \
-    --gradient_checkpointing \
-    --with_tracking
+bash scripts/train/rlvr/tulu_rlvr.sh
 ```
 
 
@@ -290,7 +222,7 @@ Tulu 2.5:
 ```
 
 Tulu 3:
-```
+```bibtex
 @article{lambert2024tulu3,
   title = {Tülu 3: Pushing Frontiers in Open Language Model Post-Training},
   author = {

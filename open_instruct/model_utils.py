@@ -15,6 +15,7 @@
 
 
 import itertools
+import logging
 from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -38,12 +39,10 @@ from rich.table import Table
 from torch.nn.parallel.distributed import DistributedDataParallel
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
-from open_instruct.ground_truth_utils import (
-    verify_gsm8k_sample,
-    verify_ifeval_sample,
-    verify_math_sample,
-)
+from open_instruct.ground_truth_utils import REWARD_FN_MAPPING
 from open_instruct.utils import retry_on_exception
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,8 +51,6 @@ class ModelConfig:
     """The model checkpoint for weights initialization."""
     model_revision: Optional[str] = None
     """The specific model version to use (can be a branch name, tag name or commit id)."""
-    trust_remote_code: bool = False
-    """Trust remote code when loading a model."""
     torch_dtype: Optional[str] = None
     """Override the default `torch.dtype` and load the model under this dtype."""
     attn_implementation: Optional[Literal["flash_attention_2"]] = None
@@ -212,53 +209,49 @@ def get_reward(
 
 
 def apply_verifiable_reward(
-    query_responses: torch.Tensor,
-    tokenizer,
+    responses: List[torch.Tensor],
+    decoded_responses: List[str],
     ground_truths: List[str],
-    datasets: List[str],
-    verify_reward: int = 10,
-    answer_extraction_model: Optional[torch.nn.Module] = None,
-    answer_extraction_tokenizer: Optional[PreTrainedTokenizer] = None,
+    datasets: List[Union[str, List[str]]],
+    reward_mult: int = 10,
 ):
-    # decode the responses
-    decoded_responses = tokenizer.batch_decode(query_responses, skip_special_tokens=True)
-    # if we have an answer extraction model, use it to extract the answer from the response
-    if answer_extraction_model is not None:
-        prompt = "Thus, the final answer is:"
-        # add the prompt to the responses
-        decoded_responses = [f"{response} {prompt}" for response in decoded_responses]
-        # extract the answer
-        answer_extraction_inputs = answer_extraction_tokenizer(
-            decoded_responses, return_tensors="pt", padding=True, truncation=True
-        )
-        answer_extraction_outputs = answer_extraction_model(**answer_extraction_inputs)
-        # get the predicted answer
-        decoded_responses = answer_extraction_tokenizer.batch_decode(
-            answer_extraction_outputs.logits.argmax(-1), skip_special_tokens=True
-        )
-    # compare with ground truth.
-    # use same logic as in gsm8k evaluation
     rewards = []
-    for prediction, ground_truth, dataset in zip(decoded_responses, ground_truths, datasets):
-        verified = False
-        if ground_truth is None:
-            rewards.append(0)
-            continue
-        if dataset.lower() == "gsm8k":
-            verified = verify_gsm8k_sample(prediction, ground_truth)
-        elif dataset.lower() == "math":
-            verified = verify_math_sample(prediction, ground_truth)
-        elif dataset.lower() == "ifeval":
-            verified = verify_ifeval_sample(prediction, ground_truth)
-        # if verified, give reward
-        if verified:
-            print("Applying ground truth reward 🤗")
-            rewards.append(verify_reward)
+    per_func_rewards = []
+    for tok_prediction, prediction, ground_truth, dataset in zip(
+        responses, decoded_responses, ground_truths, datasets
+    ):
+        # allow multiple ground truths and datasets for a single response
+        if isinstance(ground_truth, str):
+            ground_truth_list = [ground_truth]
         else:
-            rewards.append(0)
-    rewards_tensors = torch.tensor(rewards, device=query_responses.device)
-    # return rewards and count of times we applied reward
-    return rewards_tensors, (rewards_tensors > 0).sum().float().view(-1)
+            ground_truth_list = ground_truth
+        if isinstance(dataset, str):
+            dataset_list = [dataset]
+        else:
+            dataset_list = dataset
+        assert len(ground_truth_list) == len(dataset_list), "Ground truth and dataset list lengths do not match."
+        # for now, we just assume rewards are additive, rather than more complex functions.
+        reward = 0
+        per_func_reward = {}
+        for gt, ds in zip(ground_truth_list, dataset_list):
+            reward_func = REWARD_FN_MAPPING.get(ds.lower())
+            if reward_func is None:
+                logger.warning("No reward function found for dataset %s. Skipping reward.", ds)
+                continue
+            reward_weight = reward_func.weight
+            # compare with ground truth.
+            # sometimes we need the tokenized pred.
+            reward_result = reward_func(
+                tokenized_prediction=tok_prediction,
+                prediction=prediction,
+                label=gt,
+            )
+            logger.info("Applying ground truth reward 🤗")
+            reward += reward_mult * reward_result * reward_weight
+            per_func_reward[ds] = per_func_reward.get(ds, 0) + (reward_mult * reward_result * reward_weight)
+        rewards.append(reward)
+        per_func_rewards.append(per_func_reward)
+    return rewards, per_func_rewards
 
 
 def forward(
@@ -426,6 +419,20 @@ def save_with_accelerate(
     if accelerator.is_main_process:
         tokenizer.save_pretrained(output_dir)
     # customize model card (TODO (Costa): this can be prettier)
+
+
+@torch.compile(dynamic=True)
+def log_softmax_and_gather(logits: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    """
+    torch compiled version of the common `log_softmax -> gather` operation.
+
+    The compiled version of this opration avoids the (significant) memory overhead of
+    allocating a new (batch_size, seq_len, vocab_size) tensor to store the logprobs.
+
+    See https://github.com/allenai/open-instruct/pull/584
+    """
+    logprobs = logits.log_softmax(dim=-1)
+    return torch.gather(logprobs, dim=-1, index=index.unsqueeze(-1)).squeeze(-1)
 
 
 @retry_on_exception()

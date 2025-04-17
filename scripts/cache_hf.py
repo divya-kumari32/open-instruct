@@ -22,9 +22,8 @@ python mason.py \
     --preemptible \
     --budget ai2/allennlp \
     --gpus 0 -- python scripts/cache_hf.py \
-    --model_name_or_path "allenai/Llama-3.1-Tulu-3-8B-DPO" \
-    --model_revision "1208_dpo_13b_tune8e-7__allenai_open_instruct_dev__8__1733807565" \
-    --dataset_mixer_list allenai/RLVR-GSM-MATH-IF-Mixed-Constraints 1.0
+    --model_name_or_path "allenai/open_instruct_dev" \
+    --model_revision "reward_modeling__1__1737836233" \
 """
 
 
@@ -32,6 +31,8 @@ python mason.py \
 class Args:
     model_name_or_path: Optional[str] = None
     model_revision: Optional[str] = None
+    tokenizer_name_or_path: Optional[str] = None
+    tokenizer_revision: Optional[str] = None
     dataset_name: Optional[str] = None
     """The name of the dataset to use (via the datasets library)."""
     dataset_mixer: Optional[dict] = None
@@ -66,8 +67,8 @@ def main(args: Args):
         
     if args.model_name_or_path is not None:
         AutoTokenizer.from_pretrained(
-            args.model_name_or_path,
-            revision=args.model_revision,
+            args.tokenizer_name_or_path or args.model_name_or_path,
+            revision=args.tokenizer_revision or args.model_revision,
         )
         AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,

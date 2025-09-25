@@ -1180,22 +1180,36 @@ def sft_span_seach_mask_out(
     max_seq_length: int,
     asst_tag: str = "<|start_of_role|>assistant<|end_of_role|>",
     end_tag: str = "<|end_of_text|>",
+    think_tag: str = "\n<think>\n",
+    mask_think_tag: bool = False,
     ignore_label: int = -100,
 ):
     """This function encodes a single example into a format that
     can be used for sft training (similar to sft_tulu_tokenize_and_truncate_v1).
     Instead of performing label masking iteratively, this function performs
-    masking via span search and can handle complex chat templates with thinking."""
+    masking via span search and can handle complex chat templates with thinking.
+    It dynamically determines the assistant tag based on the presence of a
+    <think> block in the assistant's response.
+    """
 
-    # Span label masking strategy
-    # - search spans asst_tag ... end_tag
-    # - all such spans are left unmasked
-    # - if an asst_tage is undetected due to tokenization issues
-    #   then a span can be erronously masked
-    # - to avoid this, use tags that are guarded by special tokens
+    # Dynamically determine the assistant tag based on the conversation content.
+    def has_thinking_content(messages):
+        for message in messages:
+            if message.get("role") == "assistant":
+                # Check for an explicit 'thought' field or a '<think>' tag in the content.
+                if message.get("thought") or (
+                    isinstance(message.get("content"), str) and think_tag.strip() in message["content"]
+                ):
+                    return True
+        return False
+
     def masking_strategy_span_search(input_ids: torch.tensor, tokenizer):
         # some prep
         match = lambda x, y: torch.all(x == y)
+        # `asst_tag` is captured from the outer scope's dynamic variable
+        # By default, tokenizers for models like LLaMA, Mistral, and Phi-2 have add_bos_token=True, which means they # automatically prepend a BOS token. This would shift all token positions by 1 and break any span matching logic.
+        # Other models like Qwen, etc., have add_bos_token=False by default, so they behave differently — leading to # inconsistent behavior across model families if not explicitly handled.
+
         _asst_tag = tokenizer.encode(asst_tag, add_special_tokens=False)
         _end_tag = tokenizer.encode(end_tag, add_special_tokens=False)
         _asst_tag = torch.tensor([_asst_tag])
@@ -1223,7 +1237,7 @@ def sft_span_seach_mask_out(
         else:
             raise ValueError(
                 f"asst_tag has {num_tokens_asst} tokens, and end_tag has {num_tokens_end} "
-                "tokens, whereas the example has {num_tokens} tokens. Either "
+                f"tokens, whereas the example has {num_tokens} tokens. Either "
                 "the example is invalid or wrong tags have been passed."
             )
 
@@ -1233,11 +1247,12 @@ def sft_span_seach_mask_out(
     additional_inputs = {}
     for k in ["tools", "documents"]:
         if k in row:
-            if k == "tools":
-                if isinstance(row[k], str) and len(row[k]) > 0:
-                    additional_inputs[k] = json.loads(row[k])
-            else:
-                additional_inputs[k] = row[k]
+            row_data = row[k]
+            try:
+                row_data = json.loads(row_data)
+            except (json.JSONDecodeError, TypeError) as e:
+                pass
+            additional_inputs[k] = row_data
 
     if len(messages) == 0:
         raise ValueError("messages field is empty.")
@@ -1251,6 +1266,12 @@ def sft_span_seach_mask_out(
         add_generation_prompt=False,
         **additional_inputs,
     )
+
+    # If the user has set `mask_think_tag=True` and the current sample is a thinking sample,
+    # then the <think> token is appended to the base `asst_tag` used for span matching.
+    # This causes the <think> tag to be masked along with the asst_tag
+    if mask_think_tag and has_thinking_content(messages):
+        asst_tag += think_tag
 
     # Assume truncation if hitting the exact max length (for downstream data filtering)
     was_truncated = input_ids.shape[1] == max_seq_length
@@ -1775,7 +1796,11 @@ class DatasetTransformationCache:
         self.hf_entity = hf_entity or hf_whoami()["name"]
 
     def load_or_transform_dataset(
-        self, dcs: List[DatasetConfig], tc: TokenizerConfig, dataset_skip_cache: bool = False
+        self,
+        dcs: List[DatasetConfig],
+        tc: TokenizerConfig,
+        dataset_skip_cache: bool = False,
+        keep_in_memory: bool = False,
     ) -> Dataset:
         """Load dataset from cache if it exists, otherwise transform and cache it."""
         repo_name = f"{self.hf_entity}/dataset-mix-cached"
@@ -1790,7 +1815,12 @@ class DatasetTransformationCache:
                 print("dataset_skip_cache is True, so we will not load the dataset from cache")
             else:
                 # Use the split from the first dataset config as default
-                return load_dataset(repo_name, split=DEFAULT_SPLIT_FOR_CACHED_DATASET, revision=self.config_hash)
+                return load_dataset(
+                    repo_name,
+                    split=DEFAULT_SPLIT_FOR_CACHED_DATASET,
+                    revision=self.config_hash,
+                    keep_in_memory=keep_in_memory,
+                )
 
         print(f"Cache not found, transforming datasets...")
 
@@ -1843,7 +1873,9 @@ This is a cached dataset produced by https://github.com/allenai/open-instruct
 
         # NOTE: Load the dataset again to make sure it's downloaded to the HF cache
         print(f"✅ Found cached dataset at https://huggingface.co/datasets/{repo_name}/tree/{self.config_hash}")
-        return load_dataset(repo_name, split=DEFAULT_SPLIT_FOR_CACHED_DATASET, revision=self.config_hash)
+        return load_dataset(
+            repo_name, split=DEFAULT_SPLIT_FOR_CACHED_DATASET, revision=self.config_hash, keep_in_memory=keep_in_memory
+        )
 
 
 class LocalDatasetTransformationCache:
@@ -1876,6 +1908,7 @@ class LocalDatasetTransformationCache:
         tc: TokenizerConfig,
         dataset_skip_cache: bool = False,
         return_statistics: bool = False,
+        keep_in_memory: bool = False,
     ) -> Union[Dataset, Tuple[Dataset, Dict[str, Any]]]:
         """Load dataset from local cache if it exists, otherwise transform and cache it locally."""
         cache_path = self.get_cache_path()
@@ -1883,7 +1916,7 @@ class LocalDatasetTransformationCache:
         # Check if the cache exists
         if os.path.exists(cache_path) and not dataset_skip_cache:
             print(f"✅ Found cached dataset at {cache_path}")
-            dataset = Dataset.load_from_disk(cache_path, keep_in_memory=True)
+            dataset = Dataset.load_from_disk(cache_path, keep_in_memory=keep_in_memory)
             if return_statistics:
                 # Load statistics from cache if available
                 stats_path = os.path.join(cache_path, "dataset_statistics.json")
@@ -1965,7 +1998,7 @@ class LocalDatasetTransformationCache:
         print(f"🚀 Saved transformed dataset to {cache_path}")
         print(f"✅ Found cached dataset at {cache_path}")
 
-        loaded_dataset = Dataset.load_from_disk(cache_path, keep_in_memory=True)
+        loaded_dataset = Dataset.load_from_disk(cache_path, keep_in_memory=keep_in_memory)
         if return_statistics:
             return loaded_dataset, all_statistics
         return loaded_dataset, None
@@ -1978,13 +2011,18 @@ def get_cached_dataset(
     dataset_local_cache_dir: Optional[str] = None,
     dataset_skip_cache: bool = False,
     return_statistics: bool = False,
+    keep_in_memory: bool = False,
 ) -> Union[Dataset, Tuple[Dataset, Dict[str, Any]]]:
     if dataset_local_cache_dir is not None:
         cache = LocalDatasetTransformationCache(dataset_local_cache_dir=dataset_local_cache_dir)
     else:
         cache = DatasetTransformationCache(hf_entity=hf_entity)
     return cache.load_or_transform_dataset(
-        dcs, tc, dataset_skip_cache=dataset_skip_cache, return_statistics=return_statistics
+        dcs,
+        tc,
+        dataset_skip_cache=dataset_skip_cache,
+        return_statistics=return_statistics,
+        keep_in_memory=keep_in_memory,
     )[0]
 
 
@@ -2001,6 +2039,7 @@ def get_cached_dataset_tulu_with_statistics(
     dataset_local_cache_dir: str = "local_dataset_cache",
     dataset_skip_cache: bool = False,
     return_statistics: bool = False,
+    keep_in_memory: bool = False,
 ) -> Union[Dataset, Tuple[Dataset, Dict[str, Any]]]:
     dcs = []
     if dataset_config_hash is None:
@@ -2054,7 +2093,11 @@ def get_cached_dataset_tulu_with_statistics(
     elif dataset_cache_mode == "hf":
         cache = DatasetTransformationCache(config_hash=dataset_config_hash, hf_entity=hf_entity)
     return cache.load_or_transform_dataset(
-        dcs, tc, dataset_skip_cache=dataset_skip_cache, return_statistics=return_statistics
+        dcs,
+        tc,
+        dataset_skip_cache=dataset_skip_cache,
+        return_statistics=return_statistics,
+        keep_in_memory=keep_in_memory,
     )
 
 
@@ -2070,6 +2113,7 @@ def get_cached_dataset_tulu(
     hf_entity: Optional[str] = None,
     dataset_local_cache_dir: str = "local_dataset_cache",
     dataset_skip_cache: bool = False,
+    keep_in_memory: bool = False,
 ) -> Dataset:
     return get_cached_dataset_tulu_with_statistics(
         dataset_mixer_list,
@@ -2084,6 +2128,7 @@ def get_cached_dataset_tulu(
         dataset_local_cache_dir,
         dataset_skip_cache,
         return_statistics=False,
+        keep_in_memory=keep_in_memory,
     )[0]
 
 

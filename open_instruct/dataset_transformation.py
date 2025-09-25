@@ -1734,11 +1734,11 @@ def get_dataset_v1(dc: DatasetConfig, tc: TokenizerConfig):
     dataset = dc.dataset
 
     # Add dataset source field to track origin after shuffling
-    dataset = dataset.map(
-        lambda example: {**example, DATASET_ORIGIN_KEY: dc.dataset_name},
-        num_proc=num_proc,
-        desc=f"Adding dataset source field for {dc.dataset_name}",
-    )
+    # dataset = dataset.map(
+    #     lambda example: {**example, DATASET_ORIGIN_KEY: dc.dataset_name},
+    #     num_proc=num_proc,
+    #     desc=f"Adding dataset source field for {dc.dataset_name}",
+    # )
     for i, (fn_name, fn_args) in enumerate(zip(dc.transform_fn, dc.transform_fn_args)):
         fn, fn_type = TRANSFORM_FNS[fn_name]
         # always pass in tokenizer and other args if needed
